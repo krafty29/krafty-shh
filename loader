@@ -1,1 +1,116 @@
-loadstring(game:HttpGet("https://raw.githubusercontent.com/krafty29/krafty-shh/refs/heads/main/main?token=GHSAT0AAAAAAEQQQ7BCQHGX2M66NN5SPO6Y2YITKLA"))()
+-- // Krafty.shh Loader \\ --
+if not game:IsLoaded() then
+    game.Loaded:Wait()
+end
+
+local env = getgenv and getgenv() or _G
+
+-- // Prevent duplicate execution \\ --
+if env.KraftyLoading then
+    warn("[KRAFTY] Loader is already running.")
+    return
+end
+
+if env.KraftyInstance or env.KraftyLoaded then
+    warn("[KRAFTY] Already loaded. Unload the current instance before executing again.")
+    return
+end
+
+-- // Supported PlaceIds (add/remove IDs as needed) \\ --
+local SupportedPlaces = {
+    [2788229376]  = "Da Hood",
+    [16033173781] = "Da Hood Macro",
+    [7213786345]  = "Da Hood VC",
+    [9825515356]  = "Hood Customs",
+}
+
+-- // Fallback name patterns matching main.lua's game profiles \\ --
+local AllowNameMatch = true
+local SupportedNames = {
+    "da hood",
+    "da strike",
+    "da downhill",
+    "da uphill",
+    "dae hood",
+    "da craft",
+    "new hood",
+    "dah hood",
+    "da hills",
+    "dee hood",
+    "der hood",
+    "dei hood",
+    "dah aim trainer",
+    "hood customs",
+}
+
+local function IsSupportedPlace()
+    local placeId = game.PlaceId
+    if SupportedPlaces[placeId] then
+        return true, SupportedPlaces[placeId]
+    end
+
+    if AllowNameMatch then
+        local ok, info = pcall(function()
+            return game:GetService("MarketplaceService"):GetProductInfo(placeId)
+        end)
+        local gameName = ok and info and string.lower(info.Name) or ""
+        for _, pattern in ipairs(SupportedNames) do
+            if string.find(gameName, pattern, 1, true) then
+                return true, info.Name
+            end
+        end
+    end
+
+    return false, nil
+end
+
+local supported, placeName = IsSupportedPlace()
+if not supported then
+    warn("[KRAFTY] Unsupported game (PlaceId: " .. tostring(game.PlaceId) .. ").")
+    return
+end
+
+-- // Key check (pulls from settings table if set there, or uses getgenv().KRAFTY_KEY directly) \\ --
+local settings = env.Krafty
+if type(settings) == "table" and type(settings.Key) == "string" and settings.Key ~= "" then
+    env.KRAFTY_KEY = settings.Key
+end
+
+if type(env.KRAFTY_KEY) ~= "string" or env.KRAFTY_KEY == "" then
+    warn("[KRAFTY] Missing key. Set Key in the settings table or getgenv().KRAFTY_KEY before running.")
+    return
+end
+
+-- // Load main script \\ --
+local MAIN_URL = "https://raw.githubusercontent.com/krafty29/krafty-shh/refs/heads/main/main"
+
+env.KraftyLoading = true
+
+local fetchOk, source = pcall(function()
+    return game:HttpGet(MAIN_URL)
+end)
+
+if not fetchOk or type(source) ~= "string" or source == "" then
+    env.KraftyLoading = false
+    warn("[KRAFTY] Failed to fetch main script: " .. tostring(source))
+    return
+end
+
+local chunk, compileErr = loadstring(source)
+if not chunk then
+    env.KraftyLoading = false
+    warn("[KRAFTY] Failed to compile main script: " .. tostring(compileErr))
+    return
+end
+
+print("[KRAFTY] Loading for " .. tostring(placeName) .. " (PlaceId: " .. tostring(game.PlaceId) .. ")...")
+
+local runOk, runErr = pcall(chunk, env.KRAFTY_KEY)
+env.KraftyLoading = false
+
+if not runOk then
+    warn("[KRAFTY] Runtime error while loading main script: " .. tostring(runErr))
+    return
+end
+
+env.KraftyLoaded = true
